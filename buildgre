@@ -1,0 +1,46 @@
+#!/bin/sh
+# this script builds gre configurations
+# takes 4 arguments
+# ./buildgresec right.host.com int leftGREIP rightGREIP
+# ./buildgresec 172.18.128.76 aws0 172.20.2.0 172.20.3.0
+#
+
+HOST=$1
+INTNAME=$2
+LEFTGREIP=$3
+RIGHTGREIP=$4
+
+if [ "$#" -lt 4 ] ; then
+   echo $0 ERROR broken arguments, bailing
+   exit 1
+fi
+
+INTFILE="/etc/sysconfig/network-scripts/ifcfg-${INTNAME}"
+
+# translate hostname to IP for remote peer
+RIGHTIP=`getent ahostsv4 ${HOST} | awk '{print $1; exit}'`
+
+if [ -z "${RIGHTIP}" ] ; then
+   echo $0 ERROR failed looking up host ${HOST}
+   exit 1
+fi
+
+# check if files exist already
+if [ -w ${INTFILE} ] ; then
+    echo $0 WARNING backing up ${INTFILE}
+    /sbin/ifdown ${INTNAME}
+    mv ${INTFILE} ${INTFILE}.bak
+fi
+
+# create and bring up GRE interface
+cat > $INTFILE << EOF
+DEVICE=${INTNAME}
+BOOTPROTO=none
+ONBOOT=yes
+TYPE=GRE
+MY_INNER_IPADDR=${LEFTGREIP}
+PEER_INNER_IPADDR=${RIGHTGREIP}
+PEER_OUTER_IPADDR=${RIGHTIP}
+ZONE=trusted
+EOF
+/sbin/ifup ${INTNAME}

@@ -1,0 +1,21 @@
+#!/bin/sh
+# this script builds a swapfile
+# takes 2 arguments
+# ./buildswap /swapfile 1024 MiB
+#
+
+PATH=$1
+SIZE=$2
+UNIT=$3
+
+if [ "$#" -lt 3 ] ; then
+   echo $0 ERROR broken arguments, bailing
+   exit 1
+fi
+
+# fallocate -l 1G /swapfile could work, but not on xfs
+/bin/dd if=/dev/zero of=${PATH} bs=1${UNIT} count=${SIZE}
+/bin/chmod -v 600 ${PATH}
+/sbin/mkswap ${PATH}
+/sbin/swapon ${PATH}
+#echo "${PATH} none swap  sw  0 0" >> /etc/fstab

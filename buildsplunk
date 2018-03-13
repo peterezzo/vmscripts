@@ -1,0 +1,45 @@
+#!/bin/sh
+# this script provisions a Splunk forwarder on a CentOS 7 host
+# takes 5 arguments
+# ./buildsplunk 10.0.0.30 8089 10.0.0.30 9997 "password" [1]
+#
+
+DEPLOYHOST=$1
+DEPLOYPORT=$2
+FORWARDHOST=$3
+FORWARDPORT=$4
+PASSWORD=$5
+MONITORLOGS=$6
+
+if [ "$#" -lt 5 ] ; then
+   echo $0 ERROR broken arguments, bailing
+   exit 1
+fi
+
+# monitoring is on by default
+if [ -n "$6" ] ; then
+    MONITORLOGS=$6
+else
+    MONITORLOGS=1
+fi
+
+# install the forwarder
+curl -L "https://www.splunk.com/bin/splunk/DownloadActivityServlet?architecture=x86_64&platform=linux&version=6.5.1&product=universalforwarder&filename=splunkforwarder-6.5.1-f74036626f0c-linux-2.6-x86_64.rpm&wget=true" -o /root/splunkforwarder.rpm
+if [ ! -r /root/splunkforwarder.rpm ] ; then
+    echo $0 Splunk file not downloaded, bailing
+    exit 1
+fi
+yum -y install /root/splunkforwarder.rpm
+
+# configure the forwarder
+su -c "/opt/splunkforwarder/bin/splunk start --accept-license --auto-ports" splunk
+su -c "/opt/splunkforwarder/bin/splunk edit user admin -password '${PASSWORD}' -auth admin:changeme" splunk
+su -c "/opt/splunkforwarder/bin/splunk set deploy-poll ${DEPLOYHOST}:${DEPLOYPORT} -auth 'admin:${PASSWORD}'" splunk
+su -c "/opt/splunkforwarder/bin/splunk add forward-server ${FORWARDHOST}:${FORWARDPORT} -auth 'admin:${PASSWORD}'" splunk
+su -c "/opt/splunkforwarder/bin/splunk restart" splunk
+/opt/splunkforwarder/bin/splunk enable boot-start -user splunk
+
+# monitor /var/log by default
+setfacl -Rm "d:u:splunk:r-X" /var/log
+setfacl -Rm "u:splunk:r-X" /var/log
+su -c "/opt/splunkforwarder/bin/splunk add monitor /var/log -index os -auth 'admin:${PASSWORD}'" splunk

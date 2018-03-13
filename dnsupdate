@@ -1,0 +1,11 @@
+#!/bin/sh
+# this script makes serious assumptions that ipv4 and ipv6 are running properly with public addresses
+# ./dnsupdate my.domain.com myHE.netKey
+
+echo "Updating ipv4 for $1 "
+ip route get 8.8.8.8 | awk -v DOMAIN="$1" -v PASS="$2" '/via/{system("curl -k \"https://dyn.dns.he.net/nic/update?hostname="DOMAIN"&password="PASS"&myip="$NF"\"");exit}'
+echo
+
+echo "Updating ipv6 for $1 "
+ip route get 2001:4860:4860::8888 | awk -v DOMAIN="$1" -v PASS="$2" '/via/{system("curl -k \"https://dyn.dns.he.net/nic/update?hostname="DOMAIN"&password="PASS"&myip="$(NF-2)"\"");exit}'
+echo

@@ -1,0 +1,87 @@
+#!/bin/sh
+# this script builds gre over ipsec configurations
+# takes 6 arguments
+# ./buildgresec right.host.com int leftGREIP rightGREIP ipsec.d.name leftcert [ rightcert ]
+# ./buildgresec vpn-us.example.com gre1 172.20.1.1 172.20.0.1 hub-www www.example.com vpn.example.com
+# ./buildgresec irc.example.com gre1 172.20.0.1 172.20.1.1 hub-irc vpn.example.com
+#
+
+HOST=$1
+INTNAME=$2
+LEFTGREIP=$3
+RIGHTGREIP=$4
+VPNNAME=$5
+LEFTCERT=$6
+
+if [ "$#" -lt 6 ] ; then
+   echo $0 ERROR broken arguments, bailing
+   exit 1
+fi
+
+# rightcert is optional
+if [ -n "$7" ] ; then
+    RIGHTCERT=$7
+else
+    RIGHTCERT=$1
+fi
+
+INTFILE="/etc/sysconfig/network-scripts/ifcfg-${INTNAME}"
+VPNFILE="/etc/ipsec.d/${VPNNAME}.conf"
+
+# translate hostname to IP for remote peer
+RIGHTIP=`getent ahostsv4 ${HOST} | awk '{print $1; exit}'`
+
+if [ -z "${RIGHTIP}" ] ; then
+   echo $0 ERROR failed looking up host ${HOST}
+   exit 1
+fi
+
+# check if files exist already
+if [ -w ${INTFILE} ] ; then
+    echo $0 WARNING backing up ${INTFILE}
+    /sbin/ifdown ${INTNAME}
+    mv ${INTFILE} ${INTFILE}.bak
+fi
+
+if [ -w ${VPNFILE} ] ; then
+    /sbin/ipsec auto --down ${VPNNAME}
+    /sbin/ipsec auto --delete ${VPNNAME}
+    echo $0 WARNING backing up ${VPNFILE}
+    mv ${VPNFILE} ${VPNFILE}.bak
+fi
+
+# create and bring up GRE interface
+cat > $INTFILE << EOF
+DEVICE=${INTNAME}
+BOOTPROTO=none
+ONBOOT=yes
+TYPE=GRE
+MY_INNER_IPADDR=${LEFTGREIP}
+PEER_INNER_IPADDR=${RIGHTGREIP}
+PEER_OUTER_IPADDR=${RIGHTIP}
+ZONE=trusted
+EOF
+/sbin/ifup ${INTNAME}
+
+# create and bring up tunnel
+cat > $VPNFILE << EOF
+conn ${VPNNAME}
+    type=transport
+    left=%defaultroute
+    leftcert=${LEFTCERT}
+    leftid=%fromcert
+    leftprotoport=gre
+    right=${RIGHTIP}
+    rightcert=${RIGHTCERT}
+    rightid=%fromcert
+    rightprotoport=gre
+    #
+    #ikev2=insist   #ikev2 fails libreswan to libreswan at aws
+    ike-frag=yes
+    ike=aes128-sha1;modp2048
+    #
+    auto=start
+
+EOF
+/sbin/ipsec auto --add ${VPNNAME}
+#/sbin/ipsec auto --up ${VPNNAME}
