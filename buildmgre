@@ -1,0 +1,50 @@
+#!/bin/sh
+# this script builds multipoint gre interface configurations with ipv4 and ipv6 addresses locally assigned
+# takes 5 arguments
+# ./buildgresec int key leftGREIP leftGREIPv6IP [ firewallzone ]
+# ./buildgresec aws0 1234 172.20.2.0 fd72:a341:2e8e:2::0/64 dmz
+#
+
+INTNAME=$1
+KEY=$2
+LEFTGREIP=$3
+LEFTGREIP6=$4
+ZONE=$5
+
+if [ "$#" -lt 4 ] ; then
+   echo $0 ERROR broken arguments, bailing
+   exit 1
+fi
+
+# firewalld zone is optional
+if [ -n "$5" ] ; then
+    ZONE=$5
+else
+    ZONE=trusted
+fi
+
+INTFILE="/etc/sysconfig/network-scripts/ifcfg-${INTNAME}"
+
+# check if files exist already
+if [ -w ${INTFILE} ] ; then
+    echo $0 WARNING backing up ${INTFILE}
+    /sbin/ifdown ${INTNAME}
+    mv ${INTFILE} ${INTFILE}.bak
+fi
+
+# create and bring up GRE interface
+cat > $INTFILE << EOF
+DEVICE=${INTNAME}
+BOOTPROTO=none
+ONBOOT=yes
+TYPE=GRE
+MY_INNER_IPADDR=${LEFTGREIP}
+KEY=${KEY}
+IPV6INIT=yes
+IPV6ADDR=
+ZONE=${ZONE}
+EOF
+/sbin/ifup ${INTNAME}
+
+firewall-cmd --permanent --zone=${ZONE} --change-interface=${INTNAME}
+firewall-cmd --reload

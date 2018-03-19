@@ -1,0 +1,72 @@
+#!/bin/sh
+
+#!/bin/sh
+# this script builds libreswan-based ikev2 ipsec configurations for encrypting GRE tunnels
+# takes 4 arguments
+# ./buildgresec conname leftcert right [ left ]
+# ./buildgresec dmvpn remote.example.com vpn-us.example.com
+# ./buildgresec dmvpn vpn-us.example.com %any %eth1
+#
+
+VPNNAME=$1
+LEFTCERT=$2
+RIGHT=$3
+LEFTIP=$4
+
+if [ "$#" -lt 3 ] ; then
+   echo $0 ERROR broken arguments, bailing
+   exit 1
+fi
+
+
+# leftip is optional
+if [ -n "$4" ] ; then
+    LEFTIP=$4
+else
+    LEFTIP="%defaultroute"
+fi
+
+VPNFILE="/etc/ipsec.d/${VPNNAME}.conf"
+
+# translate hostname to IP for remote peer
+if [ ${RIGHT} == "%any" ] ; then
+    RIGHTIP=${RIGHT}
+else
+    RIGHTIP=`getent ahostsv4 ${RIGHT} | awk '{print $1; exit}'`
+fi
+
+if [ -z "${RIGHTIP}" ] ; then
+   echo $0 ERROR failed looking up host ${RIGHT}
+   exit 1
+fi
+
+if [ -w ${VPNFILE} ] ; then
+    /sbin/ipsec auto --down ${VPNNAME}
+    /sbin/ipsec auto --delete ${VPNNAME}
+    echo $0 WARNING backing up ${VPNFILE}
+    mv ${VPNFILE} ${VPNFILE}.bak
+fi
+
+# create and bring up tunnel
+cat > $VPNFILE << EOF
+conn ${VPNNAME}
+    type=transport
+    left=${LEFTIP}
+    leftcert=${LEFTCERT}
+    leftid=%fromcert
+    leftprotoport=gre
+    right=${RIGHTIP}
+    rightid=%fromcert
+    rightprotoport=gre
+    #
+    ikev2=insist
+    ike-frag=yes
+    ike=aes256-sha256;modp2048
+    ikelifetime=1h
+    phase2alg=aes256-sha256;modp2048
+    salifetime=1h
+    #
+    auto=start
+EOF
+/sbin/ipsec auto --add ${VPNNAME}
+#/sbin/ipsec auto --up ${VPNNAME}
