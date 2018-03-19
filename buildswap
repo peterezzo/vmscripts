@@ -18,4 +18,5 @@ fi
 /bin/chmod -v 600 ${PATH}
 /sbin/mkswap ${PATH}
 /sbin/swapon ${PATH}
-#echo "${PATH} none swap  sw  0 0" >> /etc/fstab
+
+/bin/grep ${PATH} /etc/fstab || echo "${PATH} none swap  sw  0 0" >> /etc/fstab
