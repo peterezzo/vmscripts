@@ -1,0 +1,3 @@
+#!/bin/sh
+
+/bin/find /var/lib/znc/moddata/log -type f -mtime +1 -delete > /dev/null 2>&1
