@@ -59,7 +59,7 @@ conn ${VPNNAME}
     rightid=%fromcert
     rightprotoport=gre
     #
-    ikev2=insist
+    ikev2=no
     ike-frag=yes
     ike=aes256-sha256;modp2048
     ikelifetime=1h
@@ -69,4 +69,4 @@ conn ${VPNNAME}
     auto=start
 EOF
 /sbin/ipsec auto --add ${VPNNAME}
-#/sbin/ipsec auto --up ${VPNNAME}
+/sbin/ipsec auto --up ${VPNNAME} &
