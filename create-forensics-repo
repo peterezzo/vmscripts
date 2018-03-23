@@ -1,0 +1,12 @@
+#!/bin/sh
+
+#!/bin/sh
+
+if [ -r /etc/yum.repos.d/cert-forensics-tools.repo ] ; then
+    echo $0 repo already installed, exiting
+    exit 0
+fi
+
+yum -y install https://forensics.cert.org/cert-forensics-tools-release-el7.rpm
+
+echo $0 repo installed
