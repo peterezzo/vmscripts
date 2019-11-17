@@ -1,11 +1,11 @@
 #!/bin/sh
 
-if [ -r /etc/yum.repos.d/rhel-libreswan.repo ] ; then
+if [ -r /etc/yum.repos.d/libreswan.repo ] ; then
     echo $0 repo already installed, exiting
     exit 0
 fi
 
-yum-config-manager --add-repo https://download.libreswan.org/rhel-libreswan.repo
 rpm --import https://download.libreswan.org/RPM-GPG-KEY-libreswan
+yum -y install https://download.libreswan.org/binaries/rhel/7/libreswan-release-7-1.noarch.rpm
 
 echo $0 repo installed
