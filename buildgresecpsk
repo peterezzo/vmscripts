@@ -1,0 +1,80 @@
+#!/bin/sh
+# this script builds gre over ipsec with psk configurations for libreswan on centos
+# it does not write the PSK file
+# takes 5 arguments
+# ./buildgresec right.host.com int leftGREIP rightGREIP ipsec.d.name
+# ./buildgresec vpn-us.example.com gre1 172.20.1.1 172.20.0.1 hub-www www.example.com vpn.example.com
+# ./buildgresec irc.example.com gre1 172.20.0.1 172.20.1.1 hub-irc vpn.example.com
+#
+
+HOST=$1
+INTNAME=$2
+LEFTGREIP=$3
+RIGHTGREIP=$4
+VPNNAME=$5
+
+if [ "$#" -lt 5 ] ; then
+   echo $0 ERROR broken arguments, bailing
+   exit 1
+fi
+
+INTFILE="/etc/sysconfig/network-scripts/ifcfg-${INTNAME}"
+VPNFILE="/etc/ipsec.d/${VPNNAME}.conf"
+
+# translate hostname to IP for remote peer
+RIGHTIP=`getent ahostsv4 ${HOST} | awk '{print $1; exit}'`
+
+if [ -z "${RIGHTIP}" ] ; then
+   echo $0 ERROR failed looking up host ${HOST}
+   exit 1
+fi
+
+# check if files exist already
+if [ -w ${INTFILE} ] ; then
+    echo $0 WARNING backing up ${INTFILE}
+    /sbin/ifdown ${INTNAME}
+    mv ${INTFILE} ${INTFILE}.bak
+fi
+
+if [ -w ${VPNFILE} ] ; then
+    /sbin/ipsec auto --down ${VPNNAME}
+    /sbin/ipsec auto --delete ${VPNNAME}
+    echo $0 WARNING backing up ${VPNFILE}
+    mv ${VPNFILE} ${VPNFILE}.bak
+fi
+
+# create and bring up GRE interface
+cat > $INTFILE << EOF
+DEVICE=${INTNAME}
+BOOTPROTO=none
+ONBOOT=yes
+TYPE=GRE
+MY_INNER_IPADDR=${LEFTGREIP}
+PEER_INNER_IPADDR=${RIGHTGREIP}
+PEER_OUTER_IPADDR=${RIGHTIP}
+ZONE=trusted
+EOF
+/sbin/ifup ${INTNAME}
+
+# create and bring up tunnel
+cat > $VPNFILE << EOF
+conn ${VPNNAME}
+    authby=secret
+    type=transport
+    left=%defaultroute
+    leftprotoport=gre
+    right=${RIGHTIP}
+    rightprotoport=gre
+    #
+    ikev2=no   #ikev2 fails libreswan to libreswan at aws
+    ike-frag=yes
+    ike=aes256-sha256;modp2048
+    ikelifetime=1h
+    phase2alg=aes256-sha256;modp2048
+    salifetime=1h
+    #
+    auto=start
+
+EOF
+/sbin/ipsec auto --add ${VPNNAME}
+#/sbin/ipsec auto --up ${VPNNAME}
