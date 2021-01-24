@@ -6,6 +6,6 @@ if [ -r /etc/yum.repos.d/libreswan.repo ] ; then
 fi
 
 rpm --import https://download.libreswan.org/RPM-GPG-KEY-libreswan
-yum -y install https://download.libreswan.org/binaries/rhel/7/libreswan-release-7-1.noarch.rpm
+rpm -ihv https://download.libreswan.org/binaries/rhel/7/libreswan-release-7-1.noarch.rpm
 
 echo $0 repo installed
