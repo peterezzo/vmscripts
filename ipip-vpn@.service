@@ -17,5 +17,5 @@ ExecStop=/sbin/ip link set dev ${INTERFACE} down
 ExecStop=/sbin/ip link del name ${INTERFACE}
 ExecStop=/sbin/ip fou del port ${FOUPORT}
 
-[Install]∑
+[Install]
 WantedBy=multi-user.target
